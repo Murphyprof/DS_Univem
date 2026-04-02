@@ -132,3 +132,77 @@ WHERE id_produto IN(1, 3, 4);
 Select id_pedido, data_pedido, id_cliente
 From tbpedido
 WHERE id_cliente IN (1, 2);
+
+
+-- Exercício 1: Clientes com Gastos Acima da Média
+-- Crie uma consulta SQL que liste os nomes dos clientes que têm pelo menos um pedido com valor total (soma de quantidade * preco_unitario dos itens) superior à média dos valores totais de todos os pedidos. Use uma subquery para calcular a média geral dos valores totais dos pedidos.
+SELECT DISTINCT c.nome
+FROM tbcliente c
+JOIN tbpedido p ON c.id_cliente = p.id_cliente
+JOIN tbitem_pedido ip ON p.id_pedido = ip.id_pedido
+GROUP BY p.id_pedido, c.nome
+HAVING SUM(ip.quantidade * ip.preco_unitario) > (
+    SELECT AVG(total_pedido) FROM (
+        SELECT SUM(quantidade * preco_unitario) AS total_pedido
+        FROM tbitem_pedido
+        GROUP BY id_pedido
+    ) AS sub
+);
+
+-- Sem Join
+
+SELECT nome
+FROM tbcliente
+WHERE id_cliente IN (
+    SELECT id_cliente
+    FROM tbpedido
+    WHERE id_pedido IN (
+        SELECT id_pedido
+        FROM tbitem_pedido
+        GROUP BY id_pedido
+        HAVING SUM(quantidade * preco_unitario) >
+        (
+            SELECT AVG(total_pedido)
+            FROM (
+                SELECT SUM(quantidade * preco_unitario) AS total_pedido
+                FROM tbitem_pedido
+                GROUP BY id_pedido
+            ) AS media_pedidos
+        )
+    )
+);
+
+-- Exercício 2: Produtos Vendidos em Mais Pedidos que a Média
+-- Crie uma consulta SQL que liste os nomes dos produtos que foram vendidos em um número de pedidos diferente (contagem de pedidos únicos onde o produto aparece) maior que a média de pedidos por produto. Use uma subquery correlacionada para calcular o número de pedidos por produto e compará-lo com a média geral.
+SELECT pr.nome_produto
+FROM tbproduto pr
+JOIN tbitem_pedido ip ON pr.id_produto = ip.id_produto
+GROUP BY pr.id_produto, pr.nome_produto
+HAVING COUNT(DISTINCT ip.id_pedido) > (
+    SELECT AVG(num_pedidos) FROM (
+        SELECT COUNT(DISTINCT id_pedido) AS num_pedidos
+        FROM tbitem_pedido
+        GROUP BY id_produto
+    ) AS sub
+);
+
+-- Sem Join
+-- 
+SELECT id_produto, nome_produto
+FROM tbproduto p
+WHERE 
+( --Conta quantos pedidos esse produto atual tem.
+    SELECT COUNT(DISTINCT id_pedido)
+    FROM tbitem_pedido i
+    WHERE i.id_produto = p.id_produto
+)
+>
+(
+    -- Calcula a média de pedidos de todos os produtos.
+    SELECT AVG(total_pedidos)
+    FROM (
+        SELECT COUNT(DISTINCT id_pedido) AS total_pedidos
+        FROM tbitem_pedido
+        GROUP BY id_produto
+    ) AS media_produtos
+);
